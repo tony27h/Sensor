@@ -147,6 +147,16 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
     len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Sensor init OK, ChipID=0x%02X\r\n", bma456_dev.chip_id);
     HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     
+    /* Write config file to enable sensor features - CRITICAL STEP! */
+    rslt = bma456mm_write_config_file(&bma456_dev);
+    if (rslt != BMA4_OK) {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Config file write failed! rslt=%d\r\n", rslt);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+        return HAL_ERROR;
+    }
+    len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Config file written\r\n");
+    HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+    
     /* Wait for sensor to be ready */
     HAL_Delay(10);
     
