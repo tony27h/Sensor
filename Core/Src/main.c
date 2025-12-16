@@ -25,6 +25,7 @@
 #include <string.h>
 
 #include "air_app.h"
+#include "bma456_app.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -123,6 +124,13 @@ int main(void)
     {
       // simple fault indication
       HAL_Delay(200);
+    }
+
+  /* Initialize BMA456 accelerometer for impact detection */
+  if (bma456_app_init(&hi2c1) != HAL_OK)
+    {
+      // BMA456 initialization failed - continue anyway
+      HAL_Delay(100);
     }
 
   /* USER CODE END 2 */
