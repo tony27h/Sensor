@@ -188,6 +188,20 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
         return HAL_ERROR;
     }
     
+    /* Also configure any-motion detection for testing (more sensitive) */
+    struct bma456mm_any_no_mot_config any_mot_config;
+    any_mot_config.threshold = 20;  /* Lower threshold in 5.11g format (~0.16g) */
+    any_mot_config.duration = 5;    /* 5 samples at 50Hz = 100ms */
+    any_mot_config.axes_en = BMA456MM_EN_ALL_AXIS;
+    any_mot_config.intr_bhvr = 0;
+    any_mot_config.slope = 0;
+    
+    rslt = bma456mm_set_any_mot_config(&any_mot_config, &bma456_dev);
+    if (rslt != BMA4_OK) {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Any-motion config failed! rslt=%d\r\n", rslt);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+    }
+    
     /* Enable high-g feature */
     rslt = bma456mm_feature_enable(BMA456MM_HIGH_G, BMA4_ENABLE, &bma456_dev);
     if (rslt != BMA4_OK) {
@@ -202,6 +216,13 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
         len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Interrupt map failed! rslt=%d\r\n", rslt);
         HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
         return HAL_ERROR;
+    }
+    
+    /* Also map any-motion interrupt for testing */
+    rslt = bma456mm_map_interrupt(BMA4_INTR1_MAP, BMA456MM_ANY_MOT_INT, BMA4_ENABLE, &bma456_dev);
+    if (rslt != BMA4_OK) {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Any-mot interrupt map failed! rslt=%d\r\n", rslt);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     }
     
     /* Configure INT1 pin: push-pull, active high, latched */
@@ -227,7 +248,20 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
         return HAL_ERROR;
     }
     
+    /* Debug: Read back interrupt enable register to verify configuration */
+    uint16_t int_map_status;
+    uint8_t int_enable_reg1, int_enable_reg2;
+    bma4_read_regs(0x58, &int_enable_reg1, 1, &bma456_dev);  /* INT1_IO_CTRL */
+    bma4_read_regs(0x53, &int_enable_reg2, 1, &bma456_dev);  /* INT_MAP_1 */
+    len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] INT1_IO_CTRL=0x%02X INT_MAP_1=0x%02X\r\n", 
+                  int_enable_reg1, int_enable_reg2);
+    HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+    
     len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Init complete! Ready for detection.\r\n");
+    HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+    
+    len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] High-G thresh=%d dur=%d hyst=%d\r\n",
+                  BMA456_HIGH_G_THRESHOLD, BMA456_HIGH_G_DURATION, BMA456_HIGH_G_HYSTERESIS);
     HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     
     /* Debug: Test accelerometer reading */
@@ -271,8 +305,17 @@ void bma456_app_handle_interrupt(void)
     len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] INT status=0x%04X, rslt=%d\r\n", int_status, rslt);
     HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     
-    /* Check if high-g interrupt occurred */
-    if ((rslt == BMA4_OK) && (int_status & BMA456MM_HIGH_G_INT)) {
+    /* Check if high-g OR any-motion interrupt occurred */
+    if ((rslt == BMA4_OK) && (int_status & (BMA456MM_HIGH_G_INT | BMA456MM_ANY_MOT_INT))) {
+        /* Report which interrupt triggered */
+        if (int_status & BMA456MM_HIGH_G_INT) {
+            len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] High-G detected!\r\n");
+            HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+        }
+        if (int_status & BMA456MM_ANY_MOT_INT) {
+            len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Any-motion detected!\r\n");
+            HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+        }
         /* Turn on LED (active LOW - RESET=ON) */
         HAL_GPIO_WritePin(LED_YELLO_GPIO_Port, LED_YELLO_Pin, GPIO_PIN_RESET);
         
