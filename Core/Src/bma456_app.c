@@ -230,6 +230,21 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
     len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Init complete! Ready for detection.\r\n");
     HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     
+    /* Debug: Test accelerometer reading */
+    struct bma4_accel test_accel;
+    rslt = bma4_read_accel_xyz(&test_accel, &bma456_dev);
+    if (rslt == BMA4_OK) {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Test read: X=%d Y=%d Z=%d\r\n", 
+                      test_accel.x, test_accel.y, test_accel.z);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+    }
+    
+    /* Debug: Check interrupt status at init */
+    uint16_t init_int_status;
+    rslt = bma456mm_read_int_status(&init_int_status, &bma456_dev);
+    len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Init INT status=0x%04X\r\n", init_int_status);
+    HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+    
     return HAL_OK;
 }
 
@@ -258,8 +273,8 @@ void bma456_app_handle_interrupt(void)
     
     /* Check if high-g interrupt occurred */
     if ((rslt == BMA4_OK) && (int_status & BMA456MM_HIGH_G_INT)) {
-        /* Turn on LED */
-        HAL_GPIO_WritePin(LED_YELLO_GPIO_Port, LED_YELLO_Pin, GPIO_PIN_SET);
+        /* Turn on LED (active LOW - RESET=ON) */
+        HAL_GPIO_WritePin(LED_YELLO_GPIO_Port, LED_YELLO_Pin, GPIO_PIN_RESET);
         
         /* Read current accelerometer data */
         rslt = bma4_read_accel_xyz(&accel_data, &bma456_dev);
@@ -312,8 +327,8 @@ void bma456_app_handle_interrupt(void)
   */
 void bma456_app_timer_callback(void)
 {
-    /* Turn off LED */
-    HAL_GPIO_WritePin(LED_YELLO_GPIO_Port, LED_YELLO_Pin, GPIO_PIN_RESET);
+    /* Turn off LED (active LOW - SET=OFF) */
+    HAL_GPIO_WritePin(LED_YELLO_GPIO_Port, LED_YELLO_Pin, GPIO_PIN_SET);
     
     /* Stop timer */
     HAL_TIM_Base_Stop_IT(&htim16);
