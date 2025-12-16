@@ -26,7 +26,12 @@ This project now includes movement/impact detection using a Bosch BMA456 acceler
    - PA9 interrupt immediately turns on PB1 LED
    - TIM16 timer starts for 5-second countdown
    - If another impact occurs while LED is on, the timer restarts (retriggerable)
-5. **LED Off**: After 5 seconds with no new detections, LED turns off automatically
+5. **UART Output**: 
+   - Accelerometer data is read immediately on interrupt
+   - Force magnitude is calculated from X, Y, Z components
+   - Data is transmitted via UART1 at 9600 baud
+   - Format: `Impact detected! Force: X.XXg (X:X.XXg Y:X.XXg Z:X.XXg)`
+6. **LED Off**: After 5 seconds with no new detections, LED turns off automatically
 
 ## Software Architecture
 
@@ -147,11 +152,12 @@ After changing these values, rebuild and reflash the firmware.
 
 ### Public Functions
 
-#### `HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c)`
+#### `HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *huart)`
 Initializes the BMA456 sensor and configures high-g detection.
 
 **Parameters:**
 - `hi2c`: Pointer to initialized I2C handle (must be I2C1)
+- `huart`: Pointer to initialized UART handle (must be UART1) for force reporting
 
 **Returns:**
 - `HAL_OK`: Initialization successful
@@ -162,7 +168,7 @@ Initializes the BMA456 sensor and configures high-g detection.
 ---
 
 #### `void bma456_app_handle_interrupt(void)`
-Handles BMA456 interrupt event. Reads interrupt status, turns on LED, and starts timer.
+Handles BMA456 interrupt event. Reads interrupt status, accelerometer data, calculates force magnitude, sends data via UART, turns on LED, and starts timer.
 
 **Called from:** `HAL_GPIO_EXTI_Callback()` in `stm32wb0x_it.c`
 
