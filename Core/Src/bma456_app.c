@@ -170,6 +170,19 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
         return HAL_ERROR;
     }
     
+    /* Disable advance power save mode - REQUIRED for INT pin output! */
+    rslt = bma4_set_advance_power_save(BMA4_DISABLE, &bma456_dev);
+    if (rslt != BMA4_OK) {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Disable power save failed! rslt=%d\r\n", rslt);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+    } else {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Advanced power save DISABLED\r\n");
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+    }
+    
+    /* Wait for power mode to stabilize */
+    HAL_Delay(5);
+    
     /* Configure high-g detection
      * Threshold: ~2g (in 5.11g format)
      * Duration: 10 samples at 100Hz = 100ms
