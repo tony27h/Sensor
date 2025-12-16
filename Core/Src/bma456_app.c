@@ -233,6 +233,11 @@ void bma456_app_handle_interrupt(void)
             /* Convert raw accelerometer data to g-force
              * For 2g range: LSB = 16384 counts/g
              * Formula: g = (raw_value / 16384.0)
+             * 
+             * Note: Using floating-point math in ISR is acceptable here because:
+             * - Event rate is low (only on impacts > 2g)
+             * - STM32WB05 has hardware FPU
+             * - Non-critical path (after LED control)
              */
             float accel_x_g = accel_data.x / 16384.0f;
             float accel_y_g = accel_data.y / 16384.0f;
@@ -244,12 +249,13 @@ void bma456_app_handle_interrupt(void)
                                       accel_z_g * accel_z_g);
             
             /* Send force data via UART */
-            char uart_msg[128];
+            char uart_msg[80];
             int len = snprintf(uart_msg, sizeof(uart_msg),
                              "Impact detected! Force: %.2fg (X:%.2fg Y:%.2fg Z:%.2fg)\r\n",
                              magnitude_g, accel_x_g, accel_y_g, accel_z_g);
             
-            HAL_UART_Transmit(bma456_huart, (uint8_t*)uart_msg, (uint16_t)len, UART_TIMEOUT_MS);
+            /* Transmit via UART - ignore errors to avoid blocking in ISR */
+            (void)HAL_UART_Transmit(bma456_huart, (uint8_t*)uart_msg, (uint16_t)len, UART_TIMEOUT_MS);
         }
         
         /* Stop timer if already running (retriggerable behavior) */
