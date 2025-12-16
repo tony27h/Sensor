@@ -230,31 +230,20 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
         return HAL_ERROR;
     }
     
-    /* Verify INT1 pin config by reading back */
+    /* Verify INT1 pin config by reading back - CORRECT REGISTER 0x53! */
     uint8_t int1_ctrl_verify;
-    bma4_read_regs(0x58, &int1_ctrl_verify, 1, &bma456_dev);
-    len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] INT1_IO_CTRL after config=0x%02X (expect 0x0A)\r\n", int1_ctrl_verify);
+    bma4_read_regs(0x53, &int1_ctrl_verify, 1, &bma456_dev);  /* 0x53 = BMA4_INT1_IO_CTRL_ADDR */
+    len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] INT1_IO_CTRL(0x53) after config=0x%02X (expect 0x0A)\r\n", int1_ctrl_verify);
     HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     
-    /* If not 0x0A, force write directly to register with correct value */
+    /* If not 0x0A, force write directly to CORRECT register */
     if (int1_ctrl_verify != 0x0A) {
         uint8_t int1_ctrl_val = 0x0A;  /* Bit3=output_en(1), Bit1=lvl(1/active high), Bit0=od(0/push-pull) */
-        rslt = bma4_write_regs(0x58, &int1_ctrl_val, 1, &bma456_dev);
+        rslt = bma4_write_regs(0x53, &int1_ctrl_val, 1, &bma456_dev);  /* 0x53 = BMA4_INT1_IO_CTRL_ADDR */
         HAL_Delay(1);
-        bma4_read_regs(0x58, &int1_ctrl_verify, 1, &bma456_dev);
-        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Force write 0x0A, readback=0x%02X\r\n", int1_ctrl_verify);
+        bma4_read_regs(0x53, &int1_ctrl_verify, 1, &bma456_dev);
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Force write to 0x53, readback=0x%02X\r\n", int1_ctrl_verify);
         HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
-        
-        /* If still not 0x0A, try setting output_en bit separately */
-        if (int1_ctrl_verify != 0x0A) {
-            uint8_t current_val = int1_ctrl_verify;
-            uint8_t new_val = current_val | 0x08;  /* Force output_en bit (bit 3) */
-            rslt = bma4_write_regs(0x58, &new_val, 1, &bma456_dev);
-            HAL_Delay(1);
-            bma4_read_regs(0x58, &int1_ctrl_verify, 1, &bma456_dev);
-            len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] OR with 0x08, final readback=0x%02X\r\n", int1_ctrl_verify);
-            HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
-        }
     }
     
     /* Set latched interrupt mode */
@@ -288,13 +277,12 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
         HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     }
     
-    /* Debug: Read back interrupt enable register to verify configuration */
-    uint16_t int_map_status;
-    uint8_t int_enable_reg1, int_enable_reg2;
-    bma4_read_regs(0x58, &int_enable_reg1, 1, &bma456_dev);  /* INT1_IO_CTRL */
-    bma4_read_regs(0x53, &int_enable_reg2, 1, &bma456_dev);  /* INT_MAP_1 */
-    len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] INT1_IO_CTRL=0x%02X INT_MAP_1=0x%02X\r\n", 
-                  int_enable_reg1, int_enable_reg2);
+    /* Debug: Read back interrupt registers to verify configuration */
+    uint8_t int_io_ctrl, int_map_data;
+    bma4_read_regs(0x53, &int_io_ctrl, 1, &bma456_dev);  /* 0x53 = INT1_IO_CTRL */
+    bma4_read_regs(0x58, &int_map_data, 1, &bma456_dev);  /* 0x58 = INT_MAP_DATA */
+    len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] INT1_IO_CTRL(0x53)=0x%02X INT_MAP_DATA(0x58)=0x%02X\r\n", 
+                  int_io_ctrl, int_map_data);
     HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     
     len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Init complete! Ready for detection.\r\n");
