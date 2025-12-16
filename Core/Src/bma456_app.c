@@ -148,7 +148,7 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c)
     
     /* Configure high-g detection
      * Threshold: ~2g (in 5.11g format)
-     * Duration: 10 samples at 200Hz = 50ms
+     * Duration: 10 samples at 100Hz = 100ms
      * Hysteresis: ~0.5g
      * Enable all axes (X, Y, Z)
      */

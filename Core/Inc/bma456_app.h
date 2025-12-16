@@ -26,8 +26,8 @@ extern "C" {
  */
 #define BMA456_HIGH_G_THRESHOLD   256
 
-/* High-g duration in 200Hz samples (5ms per sample)
- * 10 samples = 50ms
+/* High-g duration in 100Hz samples (10ms per sample)
+ * 10 samples = 100ms
  */
 #define BMA456_HIGH_G_DURATION    10
 
