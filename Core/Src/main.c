@@ -127,11 +127,27 @@ int main(void)
     }
 
   /* Initialize BMA456 accelerometer for impact detection */
-  if (bma456_app_init(&hi2c1, &huart1) != HAL_OK)
+  HAL_StatusTypeDef bma_status = bma456_app_init(&hi2c1, &huart1);
+  if (bma_status != HAL_OK)
     {
       /* BMA456 initialization failed - continue anyway */
+      char err_msg[60];
+      int len = snprintf(err_msg, sizeof(err_msg), "[MAIN] BMA456 init FAILED!\r\n");
+      HAL_UART_Transmit(&huart1, (uint8_t*)err_msg, (uint16_t)len, 200);
       HAL_Delay(100);
     }
+  else
+    {
+      char ok_msg[60];
+      int len = snprintf(ok_msg, sizeof(ok_msg), "[MAIN] BMA456 init SUCCESS!\r\n");
+      HAL_UART_Transmit(&huart1, (uint8_t*)ok_msg, (uint16_t)len, 200);
+    }
+  
+  /* Debug: Check initial LED state */
+  char led_msg[60];
+  int len = snprintf(led_msg, sizeof(led_msg), "[MAIN] LED state: %d\r\n", 
+                     HAL_GPIO_ReadPin(LED_YELLO_GPIO_Port, LED_YELLO_Pin));
+  HAL_UART_Transmit(&huart1, (uint8_t*)led_msg, (uint16_t)len, 200);
 
   /* USER CODE END 2 */
 

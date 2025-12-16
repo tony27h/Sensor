@@ -113,6 +113,8 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
 {
     int8_t rslt;
     struct bma456mm_high_g_config high_g_config;
+    char debug_msg[80];
+    int len;
     
     if (hi2c == NULL || huart == NULL) {
         return HAL_ERROR;
@@ -120,6 +122,10 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
     
     bma456_hi2c = hi2c;
     bma456_huart = huart;
+    
+    /* Debug: Initialization start */
+    len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Init start...\r\n");
+    HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     
     /* Initialize BMA4 device structure */
     bma456_dev.intf = BMA4_I2C_INTF;
@@ -133,8 +139,13 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
     /* Initialize BMA456MM sensor */
     rslt = bma456mm_init(&bma456_dev);
     if (rslt != BMA4_OK) {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Init failed! rslt=%d\r\n", rslt);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
         return HAL_ERROR;
     }
+    
+    len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Sensor init OK, ChipID=0x%02X\r\n", bma456_dev.chip_id);
+    HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     
     /* Wait for sensor to be ready */
     HAL_Delay(10);
@@ -154,6 +165,8 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
     /* Enable accelerometer */
     rslt = bma4_set_accel_enable(BMA4_ENABLE, &bma456_dev);
     if (rslt != BMA4_OK) {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Accel enable failed! rslt=%d\r\n", rslt);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
         return HAL_ERROR;
     }
     
@@ -170,18 +183,24 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
     
     rslt = bma456mm_set_high_g_config(&high_g_config, &bma456_dev);
     if (rslt != BMA4_OK) {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] High-g config failed! rslt=%d\r\n", rslt);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
         return HAL_ERROR;
     }
     
     /* Enable high-g feature */
     rslt = bma456mm_feature_enable(BMA456MM_HIGH_G, BMA4_ENABLE, &bma456_dev);
     if (rslt != BMA4_OK) {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Feature enable failed! rslt=%d\r\n", rslt);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
         return HAL_ERROR;
     }
     
     /* Map high-g interrupt to INT1 pin */
     rslt = bma456mm_map_interrupt(BMA4_INTR1_MAP, BMA456MM_HIGH_G_INT, BMA4_ENABLE, &bma456_dev);
     if (rslt != BMA4_OK) {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Interrupt map failed! rslt=%d\r\n", rslt);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
         return HAL_ERROR;
     }
     
@@ -195,14 +214,21 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
     
     rslt = bma4_set_int_pin_config(&int_config, BMA4_INTR1_MAP, &bma456_dev);
     if (rslt != BMA4_OK) {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] INT pin config failed! rslt=%d\r\n", rslt);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
         return HAL_ERROR;
     }
     
     /* Set latched interrupt mode */
     rslt = bma4_set_interrupt_mode(BMA4_LATCH_MODE, &bma456_dev);
     if (rslt != BMA4_OK) {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Interrupt mode failed! rslt=%d\r\n", rslt);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
         return HAL_ERROR;
     }
+    
+    len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Init complete! Ready for detection.\r\n");
+    HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     
     return HAL_OK;
 }
@@ -217,9 +243,18 @@ void bma456_app_handle_interrupt(void)
     uint16_t int_status;
     int8_t rslt;
     struct bma4_accel accel_data;
+    char debug_msg[80];
+    int len;
+    
+    /* Debug: Interrupt triggered */
+    len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] IRQ triggered!\r\n");
+    HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     
     /* Read and clear interrupt status */
     rslt = bma456mm_read_int_status(&int_status, &bma456_dev);
+    
+    len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] INT status=0x%04X, rslt=%d\r\n", int_status, rslt);
+    HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     
     /* Check if high-g interrupt occurred */
     if ((rslt == BMA4_OK) && (int_status & BMA456MM_HIGH_G_INT)) {

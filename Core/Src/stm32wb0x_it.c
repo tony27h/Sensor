@@ -26,6 +26,7 @@
 #include "stm32wb0x_ll_usart.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
 #include "bma456_app.h"
 /* USER CODE END Includes */
 
@@ -290,8 +291,16 @@ void RADIO_RRM_IRQHandler(void)
   */
 void HAL_GPIO_EXTI_Callback(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin)
 {
+  /* Debug: Check which GPIO triggered */
+  extern UART_HandleTypeDef huart1;
+  char msg[60];
+  int len = snprintf(msg, sizeof(msg), "[EXTI] Port=%p Pin=%d\r\n", (void*)GPIOx, GPIO_Pin);
+  HAL_UART_Transmit(&huart1, (uint8_t*)msg, (uint16_t)len, 200);
+  
   if (GPIOx == GPIOA && GPIO_Pin == GPIO_PIN_9) {
     /* BMA456 INT1 interrupt on PA9 */
+    len = snprintf(msg, sizeof(msg), "[EXTI] Calling BMA456 handler\r\n");
+    HAL_UART_Transmit(&huart1, (uint8_t*)msg, (uint16_t)len, 200);
     bma456_app_handle_interrupt();
   }
 }
