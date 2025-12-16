@@ -202,6 +202,45 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
         HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     }
     
+    /* Configure INT1 pin FIRST: push-pull, active high, output enabled */
+    struct bma4_int_pin_config int_config;
+    int_config.edge_ctrl = BMA4_LEVEL_TRIGGER;  /* Changed to level for latched mode */
+    int_config.lvl = BMA4_ACTIVE_HIGH;
+    int_config.od = BMA4_PUSH_PULL;
+    int_config.output_en = BMA4_OUTPUT_ENABLE;
+    int_config.input_en = BMA4_INPUT_DISABLE;
+    
+    rslt = bma4_set_int_pin_config(&int_config, BMA4_INTR1_MAP, &bma456_dev);
+    if (rslt != BMA4_OK) {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] INT pin config failed! rslt=%d\r\n", rslt);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+        return HAL_ERROR;
+    }
+    
+    /* Verify INT1 pin config by reading back */
+    uint8_t int1_ctrl_verify;
+    bma4_read_regs(0x58, &int1_ctrl_verify, 1, &bma456_dev);
+    len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] INT1_IO_CTRL after config=0x%02X (expect 0x0A)\r\n", int1_ctrl_verify);
+    HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+    
+    /* If still 0x00, try writing directly to register */
+    if (int1_ctrl_verify == 0x00) {
+        uint8_t int1_ctrl_val = 0x0A;  /* output_en=1, lvl=1 (active high), od=0 (push-pull) */
+        rslt = bma4_write_regs(0x58, &int1_ctrl_val, 1, &bma456_dev);
+        HAL_Delay(1);
+        bma4_read_regs(0x58, &int1_ctrl_verify, 1, &bma456_dev);
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Direct write, readback=0x%02X\r\n", int1_ctrl_verify);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+    }
+    
+    /* Set latched interrupt mode */
+    rslt = bma4_set_interrupt_mode(BMA4_LATCH_MODE, &bma456_dev);
+    if (rslt != BMA4_OK) {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Interrupt mode failed! rslt=%d\r\n", rslt);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+        return HAL_ERROR;
+    }
+    
     /* Enable high-g feature */
     rslt = bma456mm_feature_enable(BMA456MM_HIGH_G, BMA4_ENABLE, &bma456_dev);
     if (rslt != BMA4_OK) {
@@ -223,29 +262,6 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
     if (rslt != BMA4_OK) {
         len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Any-mot interrupt map failed! rslt=%d\r\n", rslt);
         HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
-    }
-    
-    /* Configure INT1 pin: push-pull, active high, latched */
-    struct bma4_int_pin_config int_config;
-    int_config.edge_ctrl = BMA4_EDGE_TRIGGER;
-    int_config.lvl = BMA4_ACTIVE_HIGH;
-    int_config.od = BMA4_PUSH_PULL;
-    int_config.output_en = BMA4_OUTPUT_ENABLE;
-    int_config.input_en = BMA4_INPUT_DISABLE;
-    
-    rslt = bma4_set_int_pin_config(&int_config, BMA4_INTR1_MAP, &bma456_dev);
-    if (rslt != BMA4_OK) {
-        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] INT pin config failed! rslt=%d\r\n", rslt);
-        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
-        return HAL_ERROR;
-    }
-    
-    /* Set latched interrupt mode */
-    rslt = bma4_set_interrupt_mode(BMA4_LATCH_MODE, &bma456_dev);
-    if (rslt != BMA4_OK) {
-        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Interrupt mode failed! rslt=%d\r\n", rslt);
-        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
-        return HAL_ERROR;
     }
     
     /* Debug: Read back interrupt enable register to verify configuration */
