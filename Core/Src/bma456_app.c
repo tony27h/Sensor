@@ -257,23 +257,40 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *h
     /* Enable high-g feature */
     rslt = bma456mm_feature_enable(BMA456MM_HIGH_G, BMA4_ENABLE, &bma456_dev);
     if (rslt != BMA4_OK) {
-        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Feature enable failed! rslt=%d\r\n", rslt);
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] High-G feature enable failed! rslt=%d\r\n", rslt);
         HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
         return HAL_ERROR;
+    }
+    len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] High-G feature enabled\r\n");
+    HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+    
+    /* Enable any-motion feature for testing (more sensitive) */
+    rslt = bma456mm_feature_enable(BMA456MM_ANY_MOT, BMA4_ENABLE, &bma456_dev);
+    if (rslt != BMA4_OK) {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Any-motion feature enable failed! rslt=%d\r\n", rslt);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+    } else {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Any-motion feature enabled\r\n");
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     }
     
     /* Map high-g interrupt to INT1 pin */
     rslt = bma456mm_map_interrupt(BMA4_INTR1_MAP, BMA456MM_HIGH_G_INT, BMA4_ENABLE, &bma456_dev);
     if (rslt != BMA4_OK) {
-        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Interrupt map failed! rslt=%d\r\n", rslt);
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] High-G interrupt map failed! rslt=%d\r\n", rslt);
         HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
         return HAL_ERROR;
     }
+    len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] High-G interrupt mapped to INT1\r\n");
+    HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     
-    /* Also map any-motion interrupt for testing */
+    /* Map any-motion interrupt to INT1 */
     rslt = bma456mm_map_interrupt(BMA4_INTR1_MAP, BMA456MM_ANY_MOT_INT, BMA4_ENABLE, &bma456_dev);
     if (rslt != BMA4_OK) {
-        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Any-mot interrupt map failed! rslt=%d\r\n", rslt);
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Any-motion interrupt map failed! rslt=%d\r\n", rslt);
+        HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
+    } else {
+        len = snprintf(debug_msg, sizeof(debug_msg), "[BMA456] Any-motion interrupt mapped to INT1\r\n");
         HAL_UART_Transmit(bma456_huart, (uint8_t*)debug_msg, (uint16_t)len, UART_TIMEOUT_MS);
     }
     
