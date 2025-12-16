@@ -40,7 +40,7 @@ extern "C" {
 #define BMA456_LED_ON_DURATION_MS 5000
 
 /* Function prototypes */
-HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c);
+HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *huart);
 void bma456_app_handle_interrupt(void);
 void bma456_app_timer_callback(void);
 

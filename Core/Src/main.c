@@ -127,7 +127,7 @@ int main(void)
     }
 
   /* Initialize BMA456 accelerometer for impact detection */
-  if (bma456_app_init(&hi2c1) != HAL_OK)
+  if (bma456_app_init(&hi2c1, &huart1) != HAL_OK)
     {
       /* BMA456 initialization failed - continue anyway */
       HAL_Delay(100);

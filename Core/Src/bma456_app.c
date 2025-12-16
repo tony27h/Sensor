@@ -9,10 +9,13 @@
   *   - BMA456 INT1 pin connected to MCU PA9 (configured as EXTI with pull-down)
   *   - LED on PB1 (LED_YELLO_Pin)
   *   - Timer TIM16 used for LED timeout
+  *   - UART1 for force reporting
   * 
   * Behavior:
   *   - On high-g detection (>~2g), INT1 goes high
   *   - PA9 interrupt handler turns on PB1 LED
+  *   - Accelerometer data is read and force magnitude calculated
+  *   - Force value and axis components sent via UART
   *   - TIM16 is started for 5-second timeout
   *   - After 5 seconds, LED is turned off
   *   - If new event occurs while LED is on, timer is restarted (retriggerable)
@@ -21,12 +24,18 @@
 
 #include "bma456_app.h"
 #include <string.h>
+#include <stdio.h>
+#include <math.h>
 
 /* Private variables */
 static struct bma4_dev bma456_dev;
 static I2C_HandleTypeDef *bma456_hi2c = NULL;
+static UART_HandleTypeDef *bma456_huart = NULL;
 extern TIM_HandleTypeDef htim16;
 static volatile uint8_t led_timer_active = 0;
+
+/* UART timeout for transmit */
+#define UART_TIMEOUT_MS  200
 
 /* Private function prototypes */
 static BMA4_INTF_RET_TYPE bma456_i2c_read(uint8_t reg_addr, uint8_t *read_data, uint32_t len, void *intf_ptr);
@@ -97,18 +106,20 @@ static void bma456_delay_us(uint32_t period, void *intf_ptr)
 /**
   * @brief  Initialize BMA456 accelerometer
   * @param  hi2c: Pointer to I2C handle
+  * @param  huart: Pointer to UART handle for force reporting
   * @retval HAL status
   */
-HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c)
+HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c, UART_HandleTypeDef *huart)
 {
     int8_t rslt;
     struct bma456mm_high_g_config high_g_config;
     
-    if (hi2c == NULL) {
+    if (hi2c == NULL || huart == NULL) {
         return HAL_ERROR;
     }
     
     bma456_hi2c = hi2c;
+    bma456_huart = huart;
     
     /* Initialize BMA4 device structure */
     bma456_dev.intf = BMA4_I2C_INTF;
@@ -198,13 +209,14 @@ HAL_StatusTypeDef bma456_app_init(I2C_HandleTypeDef *hi2c)
 
 /**
   * @brief  Handle BMA456 interrupt (called from EXTI callback)
-  *         Turns on LED and starts timer
+  *         Turns on LED, reads accelerometer data, and sends force via UART
   * @retval None
   */
 void bma456_app_handle_interrupt(void)
 {
     uint16_t int_status;
     int8_t rslt;
+    struct bma4_accel accel_data;
     
     /* Read and clear interrupt status */
     rslt = bma456mm_read_int_status(&int_status, &bma456_dev);
@@ -213,6 +225,32 @@ void bma456_app_handle_interrupt(void)
     if ((rslt == BMA4_OK) && (int_status & BMA456MM_HIGH_G_INT)) {
         /* Turn on LED */
         HAL_GPIO_WritePin(LED_YELLO_GPIO_Port, LED_YELLO_Pin, GPIO_PIN_SET);
+        
+        /* Read current accelerometer data */
+        rslt = bma4_read_accel_xyz(&accel_data, &bma456_dev);
+        
+        if (rslt == BMA4_OK && bma456_huart != NULL) {
+            /* Convert raw accelerometer data to g-force
+             * For 2g range: LSB = 16384 counts/g
+             * Formula: g = (raw_value / 16384.0)
+             */
+            float accel_x_g = accel_data.x / 16384.0f;
+            float accel_y_g = accel_data.y / 16384.0f;
+            float accel_z_g = accel_data.z / 16384.0f;
+            
+            /* Calculate magnitude of acceleration vector */
+            float magnitude_g = sqrtf(accel_x_g * accel_x_g + 
+                                      accel_y_g * accel_y_g + 
+                                      accel_z_g * accel_z_g);
+            
+            /* Send force data via UART */
+            char uart_msg[128];
+            int len = snprintf(uart_msg, sizeof(uart_msg),
+                             "Impact detected! Force: %.2fg (X:%.2fg Y:%.2fg Z:%.2fg)\r\n",
+                             magnitude_g, accel_x_g, accel_y_g, accel_z_g);
+            
+            HAL_UART_Transmit(bma456_huart, (uint8_t*)uart_msg, (uint16_t)len, UART_TIMEOUT_MS);
+        }
         
         /* Stop timer if already running (retriggerable behavior) */
         if (led_timer_active) {
